@@ -1,6 +1,7 @@
 import serial
 import time
 from collections import deque
+import matplotlib.pyplot as plt
 
 PORT = "COM3"          
 BAUD = 115200
@@ -8,7 +9,7 @@ BUFFER_SIZE = 100
 FILE_PATH = "dati_arduino.csv"
 TIMEOUT = 1
 
-def open_serial(port, baud, timeout=1):
+def open_serial(port, baud, timeout=0.1):
     ser = serial.Serial(port, baud, timeout=timeout)
     time.sleep(2)  # attesa reset Arduino
     ser.reset_input_buffer()
@@ -20,13 +21,10 @@ def parse_line(line):   # Converte ogni riga bytes -> float
         if not s:
             return None
 
-        # esempio: "A0:512,A1:678"
-        parts = s.split(',')
-        data = {}
-        for p in parts:
-            if ':' in p:
-                pin, value = p.split(':')
-                data[pin.strip()] = int(value.strip())
+        # esempio: "804 767"
+        values = s.split()
+        data = {}   #creo dizionario
+        data = {f"A{i}": int(v) for i, v in enumerate(values)}
         return data if data else None
     
     except Exception:
@@ -36,6 +34,16 @@ def main():
     try:    # apertura seriale
         ser = open_serial(PORT, BAUD, TIMEOUT)
         print(f"[INFO] Connesso a {PORT} @ {BAUD} baud.")
+
+        plt.ion()   # setup plotting
+        fig, ax = plt.subplots()
+        buffers = {}    # per gestione di più trimmer
+        lines = {}
+        ax.set_ylim(0, 1023)    #limite di arduino
+        ax.set_xlabel("Campioni (ultimi N)")
+        ax.set_ylabel("Valore analogico")
+        ax.set_title("Lettura in tempo reale")
+
     except Exception as e:
         print(f"[ERRORE] Impossibile aprire {PORT}: {e}")
         return
@@ -54,16 +62,29 @@ def main():
 
     try:
         while True:
-            line = ser.readline()
-            readings = parse_line(line)
-            if readings is not None:
+            serial_line = ser.readline()
+            v = parse_line(serial_line)
+            if v is not None:
                 ts = time.time()    # timestamp corrente
-                for pin, value in readings.items(): # una riga per ogni trimmer
+                for pin, value in v.items(): # una riga per ogni trimmer
+                    buffer.append(value)    # appendo il valore per plottarlo
                     f.write(f"{ts},{pin},{value}\n")
                 f.flush()  # assicura che i dati siano scritti subito
-                print(f"{ts:.3f}: {readings}")   # stampa su terminale x debugging
+                print(f"{ts:.3f}: {v}")   # stampa su terminale x debugging
+
+                for pin, value in v.items(): 
+                    if pin not in buffers:  # se è la prima volta che compare questo trimmer, crea buffer e linea
+                        buffers[pin] = deque(maxlen=BUFFER_SIZE)
+                        (lines[pin],) = ax.plot([], [], label=pin)
+                        ax.legend()
+                    buffers[pin].append(value) # aggiorna buffer e linea
+                    lines[pin].set_data(range(len(buffers[pin])), list(buffers[pin]))
+                ax.set_xlim(0, BUFFER_SIZE) # estende asse x fin dove arrivano i dati
+                plt.pause(0.01) # refresh
+
+
             else:
-                pass # nessun dato valido -> passa oltre
+                plt.pause(0.01) # nessun dato valido -> passa oltre ma faccio comunque aggiornare il grafico
 
     except KeyboardInterrupt:
         print("\n[STOP] Interruzione da tastiera. Chiusura...")

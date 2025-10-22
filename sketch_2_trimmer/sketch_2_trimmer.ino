@@ -7,9 +7,8 @@ void loop() {
   int t1 = analogRead(A1); 
 
   // format tipo "A0:valore,A1:valore"
-  Serial.print("A0:");
   Serial.print(t0);
-  Serial.print(",A1:");
+  Serial.print(" ");
   Serial.println(t1);
 
   delay(100);
