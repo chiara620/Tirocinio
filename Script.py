@@ -77,9 +77,13 @@ def main():
                         buffers[pin] = deque(maxlen=BUFFER_SIZE)
                         (lines[pin],) = ax.plot([], [], label=pin)
                         ax.legend()
-                    buffers[pin].append(value) # aggiorna buffer e linea
-                    lines[pin].set_data(range(len(buffers[pin])), list(buffers[pin]))
-                ax.set_xlim(0, BUFFER_SIZE) # estende asse x fin dove arrivano i dati
+                    buffers[pin].append(value) # aggiorna buffer
+                    xdata = range(len(buffers[pin]))    # aggiorna linea
+                    ydata = list(buffers[pin])
+                    lines[pin].set_data(xdata, ydata)
+                if len(buffers) > 0: 
+                    max_len = max(len(buf) for buf in buffers.values()) # sposta finestra per seguire asse x se arrivo a 100+
+                    ax.set_xlim(max(0, max_len - BUFFER_SIZE), max_len) 
                 plt.pause(0.01) # refresh
 
 
