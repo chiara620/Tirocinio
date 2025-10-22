@@ -1,4 +1,4 @@
 13/10 _ 4 ORE _ collegamento board e visualizzazione output + plotting su arduino ide
 18/10 _ 2 ORE _ setup python + studio del linguaggio stesso
 20/10 _ 4 ORE _ setup powershell e python su windows (!wls). creato script che funziona con 1 trimmer
-22/10 _ 4 ORE _ modificato script per farlo funzionare con 2 trimmer; creata GitHub repo; aggiunto plotting
+22/10 _ 5 ORE _ modificato script per farlo funzionare con 2 trimmer; creata GitHub repo; aggiunto plotting
