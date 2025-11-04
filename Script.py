@@ -1,102 +1,62 @@
-import serial
 import time
 from collections import deque
-import matplotlib.pyplot as plt
+from fft import do_fft
+from plotting import setup_live_plot, update_live_plot, setup_fft_plot, update_fft_plot
+from varie import open_serial, parse_line, setup_safe_exit
 
-PORT = "COM3"          
+PORT = "COM3"
 BAUD = 115200
 BUFFER_SIZE = 100
-FILE_PATH = "dati_arduino.csv"
 TIMEOUT = 1
 
-def open_serial(port, baud, timeout=0.1):
-    ser = serial.Serial(port, baud, timeout=timeout)
-    time.sleep(2)  # attesa reset Arduino
-    ser.reset_input_buffer()
-    return ser  # restituisco l'oggetto che farà la decodifica
-
-def parse_line(line):   # Converte ogni riga bytes -> float
-    try:
-        s = line.decode('utf-8').strip()    #utf-8 è lo standard di decodifica (non ce ne sono altri)
-        if not s:
-            return None
-
-        # esempio: "804 767"
-        values = s.split()
-        data = {}   #creo dizionario
-        data = {f"A{i}": int(v) for i, v in enumerate(values)}
-        return data if data else None
-    
-    except Exception:
-        return None
-
 def main():
-    try:    # apertura seriale
-        ser = open_serial(PORT, BAUD, TIMEOUT)
-        print(f"[INFO] Connesso a {PORT} @ {BAUD} baud.")
+    ser = open_serial(PORT, BAUD, TIMEOUT)
+    print(f"[INFO] Connesso a {PORT} @ {BAUD} baud.")
+    setup_safe_exit()
 
-        plt.ion()   # setup plotting
-        fig, ax = plt.subplots()
-        buffers = {}    # per gestione di più trimmer
-        lines = {}
-        ax.set_ylim(0, 1023)    #limite di arduino
-        ax.set_xlabel("Campioni (ultimi N)")
-        ax.set_ylabel("Valore analogico")
-        ax.set_title("Lettura in tempo reale")
+    fig, ax = setup_live_plot()
+    buffers = {}
+    lines = {}
 
-    except Exception as e:
-        print(f"[ERRORE] Impossibile aprire {PORT}: {e}")
-        return
+    fig_fft, ax_fft, line_fft = setup_fft_plot()    # crea finestra fft una sola volta
 
-    try:    # apertura file in append -> non perdo i valori precedenti
-        f = open(FILE_PATH, "a")
-        if f.tell() == 0:
-            f.write("timestamp,pin,valore\n")   # intestazione file (solo se vuoto)
-    except Exception as e:
-        print(f"[ERRORE] Impossibile aprire file {FILE_PATH}: {e}")
-        ser.close()
-        return
+    timestamps = deque(maxlen=BUFFER_SIZE)
+    prev_ts = None
 
-    buffer = deque(maxlen=BUFFER_SIZE)
     print("[INFO] Lettura in corso... (Ctrl+C per interrompere)\n")
 
     try:
         while True:
             serial_line = ser.readline()
+            now = time.time()
+            if prev_ts is not None:
+                timestamps.append(now - prev_ts)
+            prev_ts = now
+
             v = parse_line(serial_line)
-            if v is not None:
-                ts = time.time()    # timestamp corrente
-                for pin, value in v.items(): # una riga per ogni trimmer
-                    buffer.append(value)    # appendo il valore per plottarlo
-                    f.write(f"{ts},{pin},{value}\n")
-                f.flush()  # assicura che i dati siano scritti subito
-                print(f"{ts:.3f}: {v}")   # stampa su terminale x debugging
+            if v is None:
+                continue
 
-                for pin, value in v.items(): 
-                    if pin not in buffers:  # se è la prima volta che compare questo trimmer, crea buffer e linea
-                        buffers[pin] = deque(maxlen=BUFFER_SIZE)
-                        (lines[pin],) = ax.plot([], [], label=pin)
-                        ax.legend()
-                    buffers[pin].append(value) # aggiorna buffer
-                    xdata = range(len(buffers[pin]))    # aggiorna linea
-                    ydata = list(buffers[pin])
-                    lines[pin].set_data(xdata, ydata)
-                if len(buffers) > 0: 
-                    max_len = max(len(buf) for buf in buffers.values()) # sposta finestra per seguire asse x se arrivo a 100+
-                    ax.set_xlim(max(0, max_len - BUFFER_SIZE), max_len) 
-                plt.pause(0.01) # refresh
+            ts = time.time()
+            for pin, value in v.items():
+                if pin not in buffers:
+                    buffers[pin] = deque(maxlen=BUFFER_SIZE)
+                buffers[pin].append(value)
 
+                if len(buffers[pin]) == BUFFER_SIZE and len(timestamps) > 10:   # fft quando buffer pieno
+                    sample_rate = 1 / (sum(timestamps) / len(timestamps))
+                    xf, amp, dom = do_fft(buffers[pin], sample_rate)
+                    print(f"[FFT] {pin}: fs={sample_rate:.2f} Hz → freq dominante ≈ {dom:.2f} Hz")
 
-            else:
-                plt.pause(0.01) # nessun dato valido -> passa oltre ma faccio comunque aggiornare il grafico
+                    update_fft_plot(ax_fft, line_fft, xf, amp)
+
+            update_live_plot(ax, buffers, lines, BUFFER_SIZE)
 
     except KeyboardInterrupt:
         print("\n[STOP] Interruzione da tastiera. Chiusura...")
 
     finally:
         ser.close()
-        f.close()
-        print(f"[INFO] File salvato in: {FILE_PATH}")
 
 if __name__ == "__main__":
     main()

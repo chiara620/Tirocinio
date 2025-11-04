@@ -2,3 +2,5 @@
 18/10 _ 2 ORE _ setup python + studio del linguaggio stesso
 20/10 _ 4 ORE _ setup powershell e python su windows (!wls). creato script che funziona con 1 trimmer
 22/10 _ 5 ORE _ modificato script per farlo funzionare con 2 trimmer; creata GitHub repo; aggiunto plotting
+03/11 _ 2 ORE _ implementazione trasformata di fourier e individuo frequenza dominante
+04/11 _ 4 ORE _ continuo giorno precedente; suddivisione in librerie; risoluzione problemi vari
