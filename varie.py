@@ -4,7 +4,21 @@ import signal
 import sys
 import warnings
 import matplotlib
-matplotlib.use("TkAgg")  # assicura compatibilità con Tkinter
+matplotlib.use("TkAgg")
+import csv
+
+def save_csv(filename, original, reconstructed, freq):
+    N = len(original)
+    if len(reconstructed) != N:
+        raise ValueError("Original and reconstructed must have same length")
+
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["n", "original", "reconstructed", "freq"])
+
+        for i in range(N):
+            writer.writerow([i, original[i], reconstructed[i], freq])
+
 
 def open_serial(port, baud, timeout=0.1):
     ser = serial.Serial(port, baud, timeout=timeout)
@@ -13,20 +27,7 @@ def open_serial(port, baud, timeout=0.1):
     return ser
 
 
-def parse_line(line):
-    try:
-        s = line.decode('utf-8').strip()    # standard protocollo di arduino
-        if not s:
-            return None
-
-        # da arduino ricevo valore tipo "804 767"
-        values = s.split()
-        data = {f"A{i}": int(v) for i, v in enumerate(values)}
-        return data if data else None
-    except Exception:
-        return None
-
-def setup_safe_exit():
+def setup_exit():
     warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")    # ignoro junk warning
 
     def handler(sig, frame):

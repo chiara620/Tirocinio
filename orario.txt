@@ -1,6 +1,47 @@
-13/10 _ 4 ORE _ collegamento board e visualizzazione output + plotting su arduino ide
+13/10 _ 4 ORE _ collegamento board, setup arduino ide, analogRead + plotting
 18/10 _ 2 ORE _ setup python + studio del linguaggio stesso
 20/10 _ 4 ORE _ setup powershell e python su windows (!wls). creato script che funziona con 1 trimmer
 22/10 _ 5 ORE _ modificato script per farlo funzionare con 2 trimmer; creata GitHub repo; aggiunto plotting
 03/11 _ 2 ORE _ implementazione trasformata di fourier e individuo frequenza dominante
 04/11 _ 4 ORE _ continuo giorno precedente; suddivisione in librerie; risoluzione problemi vari
+10/11 _ 1 ORA _ test finale con sinusoidi e onde quadre simulate
+15/11 _ 1 ORA _ analisi del problema (i valori ottenuti non sono quelli attesi)
+16/11 _ 3 ORE _ fix: ora i valori sono simili
+
+
+1. Abbiamo tolto tutto il plotting FFT
+La finestra FFT in tempo reale rallentava Python, introduceva jitter e sporcava completamente la misura della frequenza di campionamento (fs).
+→ Rimuovendola, la lettura seriale è diventata stabile e molto più veloce.
+
+2. Abbiamo aumentato drasticamente il buffer FFT
+Da 100 → 500 campioni
+Più campioni =  media temporale più lunga
+                jitter nei timestamp molto più basso
+                fs calcolata in modo più stabile
+                frequenza stimata via FFT molto più precisa
+
+3. Abbiamo misurato la frequenza di campionamento (fs) con timestamp reali
+Usando:
+timestamps.append(now - prev_ts)
+sample_rate = 1 / (sum(timestamps) / len(timestamps))
+Con tantissimi timestamp raccolti, la stima di fs è diventata consistente e vicina alla realtà (≈1500 Hz).
+
+4. Abbiamo eliminato ogni ritardo dallo sketch Arduino
+Il professore ti aveva dato uno sketch con:
+delay(1);
+Questo dimezzava/artificializzava la frequenza di campionamento → FFT impossibile.
+Togliendo il delay Arduino ha iniziato a campionare alla massima velocità possibile, rendendo stabile fs.
+
+5. Abbiamo letto la seriale in blocco con ser.read(ser.in_waiting)
+Prima la lettura era:
+ser.readline()
+che introduceva delay, bloccava il loop, scaricava la UART irregolarmente
+Passando a:
+raw = ser.read(ser.in_waiting or 1)
+abbiamo eliminato jitter, letto la seriale appena arrivano dati, stabilizzato ulteriormente fs
+
+RISULTATO
+Le frequenze stimate sono diventate molto vicine ai valori reali attesi:
+A0 ≈ 38 Hz (ottenuto ~40–41 Hz)
+A2 ≈ 17 Hz (ottenuto ~20–21 Hz)
+che è esattamente ciò che ci si aspetta con questa architettura.

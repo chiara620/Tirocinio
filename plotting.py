@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 def setup_live_plot():
     plt.ion()
@@ -43,3 +44,34 @@ def update_fft_plot(ax_fft, line_fft, xf, amplitudes):
     ax_fft.relim()
     ax_fft.autoscale_view()
     plt.pause(0.05)
+
+
+def setup_reconstruct_plot():
+    plt.ion()
+    fig, ax = plt.subplots()
+    ax.set_title("Ricostruzione tramite troncamento Fourier")
+    ax.set_xlabel("Campioni")
+    ax.set_ylabel("Valore ricostruito")
+    ax.grid(True)
+
+    line_A0, = ax.plot([], [], label="Ricostruzione A0", linestyle='--')
+    line_A2, = ax.plot([], [], label="Ricostruzione A2", linestyle='-.')
+
+    ax.legend()
+    return fig, ax, line_A0, line_A2
+
+
+def update_reconstruct_plot(ax, line_A0, line_A2, recon_A0, recon_A2):
+    x = np.arange(len(recon_A0))
+
+    line_A0.set_data(x, recon_A0)
+    line_A2.set_data(x, recon_A2)
+
+    ax.set_xlim(0, len(recon_A0))
+
+    all_vals = np.concatenate([recon_A0, recon_A2])
+    ax.set_ylim(np.min(all_vals) * 0.9, np.max(all_vals) * 1.1)
+
+    ax.figure.canvas.draw()
+    ax.figure.canvas.flush_events()
+

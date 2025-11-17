@@ -1,56 +1,77 @@
 import time
 from collections import deque
-from fft import do_fft
-from plotting import setup_live_plot, update_live_plot, setup_fft_plot, update_fft_plot
-from varie import open_serial, parse_line, setup_safe_exit
+from fft import do_fft, signal_reconstruction
+from varie import open_serial, setup_exit, save_csv
+from plotting import setup_live_plot, update_live_plot, setup_reconstruct_plot, update_reconstruct_plot
 
 PORT = "COM3"
 BAUD = 115200
-BUFFER_SIZE = 100
+BUFFER_SIZE = 500
 TIMEOUT = 1
+
+FFT_EVERY = 10  # calcola FFT ogni 10 buffer pieni
 
 def main():
     ser = open_serial(PORT, BAUD, TIMEOUT)
     print(f"[INFO] Connesso a {PORT} @ {BAUD} baud.")
-    setup_safe_exit()
-
+    setup_exit()
     fig, ax = setup_live_plot()
-    buffers = {}
-    lines = {}
+    fig_rec, ax_rec, line_A0, line_A2 = setup_reconstruct_plot()
 
-    fig_fft, ax_fft, line_fft = setup_fft_plot()    # crea finestra fft una sola volta
+    lines = {}
+    buffers = {}
+    buffers["A0"] = deque(maxlen=BUFFER_SIZE)
+    buffers["A2"] = deque(maxlen=BUFFER_SIZE)
 
     timestamps = deque(maxlen=BUFFER_SIZE)
     prev_ts = None
 
     print("[INFO] Lettura in corso... (Ctrl+C per interrompere)\n")
 
+
     try:
         while True:
-            serial_line = ser.readline()
-            now = time.time()
-            if prev_ts is not None:
-                timestamps.append(now - prev_ts)
-            prev_ts = now
+            raw = ser.read(ser.in_waiting or 1).decode(errors="ignore")
 
-            v = parse_line(serial_line)
-            if v is None:
-                continue
+            for line in raw.splitlines():
+                parts = line.strip().split()
+                if len(parts) != 2:
+                    continue
 
-            ts = time.time()
-            for pin, value in v.items():
-                if pin not in buffers:
-                    buffers[pin] = deque(maxlen=BUFFER_SIZE)
-                buffers[pin].append(value)
+                try:
+                    a0 = int(parts[0])
+                    a2 = int(parts[1])
+                except:
+                    continue
 
-                if len(buffers[pin]) == BUFFER_SIZE and len(timestamps) > 10:   # fft quando buffer pieno
-                    sample_rate = 1 / (sum(timestamps) / len(timestamps))
-                    xf, amp, dom = do_fft(buffers[pin], sample_rate)
-                    print(f"[FFT] {pin}: fs={sample_rate:.2f} Hz → freq dominante ≈ {dom:.2f} Hz")
+                buffers["A0"].append(a0)
+                buffers["A2"].append(a2)
 
-                    update_fft_plot(ax_fft, line_fft, xf, amp)
+                now = time.time()   # calcolo timestamp per fs
+                if prev_ts is not None:
+                    timestamps.append(now - prev_ts)
+                prev_ts = now
+
+            if len(buffers["A0"]) == BUFFER_SIZE:   # fft quando buffer pieno
+                sample_rate = 1 / (sum(timestamps) / len(timestamps))
+                if not (1000 < sample_rate < 3000): # salto il junk
+                    continue    
+                xf0, amp0, dom0 = do_fft(buffers["A0"], sample_rate)
+                xf2, amp2, dom2 = do_fft(buffers["A2"], sample_rate)
+
+                print(f"[A0] fs={sample_rate:.2f} → f={dom0:.2f}")
+                print(f"[A2] fs={sample_rate:.2f} → f={dom2:.2f}")
+
+                # ricostruzione tramite Fourier troncato
+                recon_A0 = signal_reconstruction(list(buffers["A0"]), sample_rate, N_harmonics=100)
+                recon_A2 = signal_reconstruction(list(buffers["A2"]), sample_rate, N_harmonics=100)
+                update_reconstruct_plot(ax_rec, line_A0, line_A2, recon_A0, recon_A2)
+
+                save_csv("A0_output.csv", list(buffers["A0"]), recon_A0, dom0)
+                save_csv("A2_output.csv", list(buffers["A2"]), recon_A2, dom2)
 
             update_live_plot(ax, buffers, lines, BUFFER_SIZE)
+
 
     except KeyboardInterrupt:
         print("\n[STOP] Interruzione da tastiera. Chiusura...")
@@ -58,6 +79,6 @@ def main():
     finally:
         ser.close()
 
+
 if __name__ == "__main__":
     main()
-
