@@ -11,8 +11,7 @@ TIMEOUT = 1
 
 FFT_EVERY = 10  # fft ogni 10 buffer pieni
 
-DELTA = 5
-.0  # larghezza box passabanda in Hz
+DELTA = 5.0  # larghezza box passabanda in Hz
 
 def main():
     ser = open_serial(PORT, BAUD, TIMEOUT)
@@ -69,7 +68,6 @@ def main():
 
                 print(f"[SIG] fs={sample_rate:.2f} → picchi: {f1:.2f} Hz, {f2:.2f} Hz")
 
-                # 2) Applica la passabanda attorno ai due picchi
                 y1 = box_filter_reconstruct(list(buffers["SIG"]), sample_rate, f0=f1, delta_hz=DELTA)
                 y2 = box_filter_reconstruct(list(buffers["SIG"]), sample_rate, f0=f2, delta_hz=DELTA)
 
