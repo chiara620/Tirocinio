@@ -49,29 +49,35 @@ def update_fft_plot(ax_fft, line_fft, xf, amplitudes):
 def setup_reconstruct_plot():
     plt.ion()
     fig, ax = plt.subplots()
-    ax.set_title("Ricostruzione tramite troncamento Fourier")
+    ax.set_title("Segnali separati (box filter in FFT)")
     ax.set_xlabel("Campioni")
     ax.set_ylabel("Valore ricostruito")
     ax.grid(True)
 
-    line_A0, = ax.plot([], [], label="Ricostruzione A0", linestyle='--')
-    line_A2, = ax.plot([], [], label="Ricostruzione A2", linestyle='-.')
+    line_sig_1, = ax.plot([], [], label="Componente 1", linestyle='--')
+    line_sig_2, = ax.plot([], [], label="Componente 2", linestyle='-.')
 
     ax.legend()
-    return fig, ax, line_A0, line_A2
+    return fig, ax, line_sig_1, line_sig_2
 
 
-def update_reconstruct_plot(ax, line_A0, line_A2, recon_A0, recon_A2):
-    x = np.arange(len(recon_A0))
+def update_reconstruct_plot(ax, line_sig_1, line_sig_2, y1, y2, f1, f2):
+    x = np.arange(len(y1))
 
-    line_A0.set_data(x, recon_A0)
-    line_A2.set_data(x, recon_A2)
+    line_sig_1.set_data(x, y1)
+    line_sig_2.set_data(x, y2)
 
-    ax.set_xlim(0, len(recon_A0))
+    line_sig_1.set_label(f"Componente ~ {f1:.1f} Hz")
+    line_sig_2.set_label(f"Componente ~ {f2:.1f} Hz")
 
-    all_vals = np.concatenate([recon_A0, recon_A2])
-    ax.set_ylim(np.min(all_vals) * 0.9, np.max(all_vals) * 1.1)
+    ax.set_xlim(0, len(y1))
 
+    all_vals = np.concatenate([y1, y2])
+    ymin = np.min(all_vals)
+    ymax = np.max(all_vals)
+    ax.set_ylim(ymin * 0.9, ymax * 1.1)
+
+    ax.legend(loc="lower right")
     ax.figure.canvas.draw()
     ax.figure.canvas.flush_events()
 

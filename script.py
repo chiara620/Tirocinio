@@ -1,6 +1,6 @@
 import time
 from collections import deque
-from fft import do_fft, signal_reconstruction
+from fft import do_fft, signal_reconstruction, find_two_dominant_freqs, box_filter_reconstruct
 from varie import open_serial, setup_exit, save_csv
 from plotting import setup_live_plot, update_live_plot, setup_reconstruct_plot, update_reconstruct_plot
 
@@ -9,25 +9,26 @@ BAUD = 115200
 BUFFER_SIZE = 500
 TIMEOUT = 1
 
-FFT_EVERY = 10  # calcola FFT ogni 10 buffer pieni
+FFT_EVERY = 10  # fft ogni 10 buffer pieni
+
+DELTA = 5
+.0  # larghezza box passabanda in Hz
 
 def main():
     ser = open_serial(PORT, BAUD, TIMEOUT)
     print(f"[INFO] Connesso a {PORT} @ {BAUD} baud.")
     setup_exit()
     fig, ax = setup_live_plot()
-    fig_rec, ax_rec, line_A0, line_A2 = setup_reconstruct_plot()
+    fig_rec, ax_rec, line_sig_1, line_sig_2 = setup_reconstruct_plot()
 
     lines = {}
     buffers = {}
-    buffers["A0"] = deque(maxlen=BUFFER_SIZE)
-    buffers["A2"] = deque(maxlen=BUFFER_SIZE)
+    buffers["SIG"] = deque(maxlen=BUFFER_SIZE)
 
     timestamps = deque(maxlen=BUFFER_SIZE)
     prev_ts = None
 
     print("[INFO] Lettura in corso... (Ctrl+C per interrompere)\n")
-
 
     try:
         while True:
@@ -35,50 +36,54 @@ def main():
 
             for line in raw.splitlines():
                 parts = line.strip().split()
-                if len(parts) != 2:
+                if len(parts) != 1:
                     continue
 
                 try:
-                    a0 = int(parts[0])
-                    a2 = int(parts[1])
+                    v = int(parts[0])
                 except:
                     continue
 
-                buffers["A0"].append(a0)
-                buffers["A2"].append(a2)
+                buffers["SIG"].append(v)
 
                 now = time.time()   # calcolo timestamp per fs
                 if prev_ts is not None:
                     timestamps.append(now - prev_ts)
                 prev_ts = now
 
-            if len(buffers["A0"]) == BUFFER_SIZE:   # fft quando buffer pieno
+            if len(buffers["SIG"]) == BUFFER_SIZE:   # fft quando buffer pieno
                 sample_rate = 1 / (sum(timestamps) / len(timestamps))
                 if not (1000 < sample_rate < 3000): # salto il junk
-                    continue    
-                xf0, amp0, dom0 = do_fft(buffers["A0"], sample_rate)
-                xf2, amp2, dom2 = do_fft(buffers["A2"], sample_rate)
+                    continue
 
-                print(f"[A0] fs={sample_rate:.2f} → f={dom0:.2f}")
-                print(f"[A2] fs={sample_rate:.2f} → f={dom2:.2f}")
+                f1, f2 = find_two_dominant_freqs(
+                    list(buffers["SIG"]),
+                    sample_rate,
+                    f_min=1.0,
+                    f_max=200.0,
+                    min_sep_hz=5.0
+                )
 
-                # ricostruzione tramite Fourier troncato
-                recon_A0 = signal_reconstruction(list(buffers["A0"]), sample_rate, N_harmonics=100)
-                recon_A2 = signal_reconstruction(list(buffers["A2"]), sample_rate, N_harmonics=100)
-                update_reconstruct_plot(ax_rec, line_A0, line_A2, recon_A0, recon_A2)
+                if f1 is None or f2 is None:
+                    continue
 
-                save_csv("A0_output.csv", list(buffers["A0"]), recon_A0, dom0)
-                save_csv("A2_output.csv", list(buffers["A2"]), recon_A2, dom2)
+                print(f"[SIG] fs={sample_rate:.2f} → picchi: {f1:.2f} Hz, {f2:.2f} Hz")
+
+                # 2) Applica la passabanda attorno ai due picchi
+                y1 = box_filter_reconstruct(list(buffers["SIG"]), sample_rate, f0=f1, delta_hz=DELTA)
+                y2 = box_filter_reconstruct(list(buffers["SIG"]), sample_rate, f0=f2, delta_hz=DELTA)
+
+                update_reconstruct_plot(ax_rec, line_sig_1, line_sig_2, y1, y2, f1, f2)
+
+                save_csv("SIG_box.csv", list(buffers["SIG"]), y1, f1)
 
             update_live_plot(ax, buffers, lines, BUFFER_SIZE)
-
 
     except KeyboardInterrupt:
         print("\n[STOP] Interruzione da tastiera. Chiusura...")
 
     finally:
         ser.close()
-
 
 if __name__ == "__main__":
     main()
