@@ -9,4 +9,5 @@
 16/11 _ 3 ORE _ fix: ora i valori sono simili
 17/11 _ 2 ORE _ ricostruzione del segnale tramite troncamento della serie di fourier; plotting del segnale riccostruito
 18/12 _ 3 ORE _ script aggiurnato per ricevere un solo segnale fisico poi distinto in due onde
-27/04 _ 3 ORE _ leggo magnitudine dei potenziometri aggiunti al circuito
+27/04 _ 3 ORE _ leggo magnitude dei potenziometri aggiunti al circuito
+21/05 _ 5 ORE _ sistemazione errori e scrittura tesi
