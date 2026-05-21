@@ -28,24 +28,6 @@ def update_live_plot(ax, buffers, lines, buffer_size):
     plt.pause(0.01)
 
 
-def setup_fft_plot():
-    plt.ion()
-    fig_fft, ax_fft = plt.subplots()
-    (line_fft,) = ax_fft.plot([], [], lw=1)
-    ax_fft.set_xlabel("Frequenza [Hz]")
-    ax_fft.set_ylabel("Ampiezza")
-    ax_fft.set_title("FFT in tempo reale")
-    ax_fft.grid(True)
-    return fig_fft, ax_fft, line_fft
-
-
-def update_fft_plot(ax_fft, line_fft, xf, amplitudes):
-    line_fft.set_data(xf, amplitudes)
-    ax_fft.relim()
-    ax_fft.autoscale_view()
-    plt.pause(0.05)
-
-
 def setup_reconstruct_plot():
     plt.ion()
     fig, ax = plt.subplots()
