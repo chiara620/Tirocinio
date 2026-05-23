@@ -1,12 +1,7 @@
 import numpy as np
 from numpy.fft import fft, ifft, fftfreq, rfft, rfftfreq
 
-
 def positive_spectrum(buffer, fs):
-    """
-    Calcola lo spettro solo sulle frequenze positive.
-    Rimuove la componente continua prima della FFT.
-    """
     x = np.asarray(buffer, dtype=float)
 
     if len(x) == 0:
@@ -29,9 +24,6 @@ def positive_spectrum(buffer, fs):
 
 
 def band_magnitude(freqs, amp, center_freq, delta_hz):
-    """
-    Calcola la magnitude in una piccola banda attorno a center_freq.
-    """
     mask = np.abs(freqs - center_freq) <= delta_hz
 
     if not np.any(mask):
@@ -41,9 +33,6 @@ def band_magnitude(freqs, amp, center_freq, delta_hz):
 
 
 def get_magnitude_at_freq(buffer, fs, target_freq, delta_hz=3.0):
-    """
-    Magnitude della componente FFT nell'intorno della frequenza target.
-    """
     freqs, amp = positive_spectrum(buffer, fs)
 
     if freqs is None:
@@ -53,14 +42,9 @@ def get_magnitude_at_freq(buffer, fs, target_freq, delta_hz=3.0):
 
 
 def find_local_peaks(freqs, amp, f_min, f_max, max_peaks=20):
-    """
-    Trova picchi locali nello spettro positivo, dentro una certa banda.
-    Non usa scipy, così il progetto resta leggero.
-    """
     if freqs is None or amp is None or len(freqs) < 3:
         return []
 
-    # Picchi locali semplici: maggiore del precedente e del successivo
     peak_indices = []
 
     for i in range(1, len(amp) - 1):
@@ -70,17 +54,12 @@ def find_local_peaks(freqs, amp, f_min, f_max, max_peaks=20):
         if amp[i] > amp[i - 1] and amp[i] >= amp[i + 1]:
             peak_indices.append(i)
 
-    # Ordina i picchi per ampiezza decrescente
     peak_indices = sorted(peak_indices, key=lambda i: amp[i], reverse=True)
 
     return peak_indices[:max_peaks]
 
 
 def is_harmonic_related(fa, fb, tolerance_hz=2.0, max_ratio=9):
-    """
-    Ritorna True se una frequenza sembra essere armonica dell'altra.
-    Esempio: 79.5 è circa 3 * 26.5.
-    """
     if fa <= 0 or fb <= 0:
         return False
 
@@ -95,11 +74,6 @@ def is_harmonic_related(fa, fb, tolerance_hz=2.0, max_ratio=9):
 
 
 def score_square_family(freqs, amp, f0, delta_hz=3.0, spectrum_max=120.0):
-    """
-    Assegna un punteggio a una possibile fondamentale di onda quadra.
-    Per un'onda quadra ideale ci aspettiamo energia su:
-    f0, 3f0, 5f0, 7f0...
-    """
     harmonics = [1, 3, 5, 7]
     weights = {
         1: 1.00,
@@ -134,10 +108,6 @@ def score_square_family(freqs, amp, f0, delta_hz=3.0, spectrum_max=120.0):
 
 
 def cluster_candidates(candidates, tolerance_hz):
-    """
-    Raggruppa candidati molto vicini tra loro.
-    Esempio: 26.3, 26.5, 26.7 diventano un solo candidato circa 26.5.
-    """
     if not candidates:
         return []
 
@@ -213,9 +183,7 @@ def find_two_independent_peaks(
             suppress_mask = np.abs(freqs - fh) <= delta_hz
             work_amp[suppress_mask] = 0
 
-        # Sopprimi anche eventuali subarmoniche evidenti
-        # Esempio: se scelgo 40 Hz, non voglio poi scegliere 20 Hz
-        # se è chiaramente collegata come metà.
+        # Sopprimi anche eventuali subarmoniche evidenti (es se scelgo 40hz non voglio prendere 20)
         for h in [2, 3, 4, 5, 6, 7]:
             fh = f_peak / h
             if fh < f_min:
@@ -239,10 +207,6 @@ def find_two_independent_peaks(
 
 
 def box_filter_reconstruct(buffer, fs, f0, delta_hz):
-    """
-    Ricostruisce nel tempo la componente attorno a f0
-    azzerando le frequenze fuori dalla box.
-    """
     x = np.asarray(buffer, dtype=float)
     x = x - np.mean(x)
 
@@ -260,11 +224,6 @@ def box_filter_reconstruct(buffer, fs, f0, delta_hz):
 
 
 def signal_reconstruction(x, fs, N_harmonics=10):
-    """
-    Ricostruzione semplice tramite troncamento dei coefficienti FFT.
-    Nota: N_harmonics qui rappresenta il numero di bin mantenuti,
-    non necessariamente armoniche fisiche rispetto a una fondamentale nota.
-    """
     N = len(x)
     X = fft(x)
 

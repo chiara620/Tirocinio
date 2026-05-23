@@ -1,19 +1,10 @@
 from collections import deque
 
-from fft import (
-    find_two_independent_peaks,
-    box_filter_reconstruct,
-    get_magnitude_at_freq
-)
+from fft import find_two_independent_peaks, box_filter_reconstruct, get_magnitude_at_freq
 
 from varie import open_serial, setup_exit, save_csv
 
-from plotting import (
-    setup_live_plot,
-    update_live_plot,
-    setup_reconstruct_plot,
-    update_reconstruct_plot
-)
+from plotting import setup_live_plot, update_live_plot, setup_reconstruct_plot, update_reconstruct_plot
 
 PORT = "COM3"
 BAUD = 115200
